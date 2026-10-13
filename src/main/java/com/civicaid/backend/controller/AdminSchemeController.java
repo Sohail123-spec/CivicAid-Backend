@@ -19,6 +19,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.civicaid.backend.dto.SchemeCategoryCreateRequest;
+import com.civicaid.backend.dto.SchemeCategoryResponse;
+import com.civicaid.backend.dto.SchemeProductCreateRequest;
+import com.civicaid.backend.dto.SchemeProductResponse;
 import com.civicaid.backend.dto.SchemeVerificationRequest;
 import com.civicaid.backend.dto.SchemeVerificationResponse;
 
@@ -106,6 +110,36 @@ public class AdminSchemeController {
 
         return ResponseEntity.ok(
                 schemeService.getVerificationHistory(schemeId));
+    }
+
+    @GetMapping("/{schemeId}/categories")
+    public ResponseEntity<List<SchemeCategoryResponse>> getSchemeCategories(
+            @PathVariable UUID schemeId) {
+        return ResponseEntity.ok(schemeService.getAdminSchemeCategories(schemeId));
+    }
+
+    @PostMapping("/{schemeId}/categories")
+    public ResponseEntity<SchemeCategoryResponse> addSchemeCategory(
+            @PathVariable UUID schemeId,
+            @Valid @RequestBody SchemeCategoryCreateRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(schemeService.addSchemeCategory(
+                schemeId, request, authentication.getName()));
+    }
+
+    @GetMapping("/{schemeId}/products")
+    public ResponseEntity<List<SchemeProductResponse>> getSchemeProducts(
+            @PathVariable UUID schemeId) {
+        return ResponseEntity.ok(schemeService.getAdminSchemeProducts(schemeId));
+    }
+
+    @PostMapping("/{schemeId}/products")
+    public ResponseEntity<SchemeProductResponse> addSchemeProduct(
+            @PathVariable UUID schemeId,
+            @Valid @RequestBody SchemeProductCreateRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(schemeService.addSchemeProduct(
+                schemeId, request, authentication.getName()));
     }
 
 }

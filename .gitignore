@@ -34,3 +34,13 @@ build/
 
 # Runtime and build logs
 *.log
+
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+application-local.properties
+
+# Build output and logs
+target/
+*.log

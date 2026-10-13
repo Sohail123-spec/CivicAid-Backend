@@ -197,6 +197,24 @@ class ATCategoryApiTests {
                 .andExpect(jsonPath("$[0].reviewNotes").value("The source no longer supports this category."));
     }
 
+    @Test
+    @WithMockUser(username = "admin@example.org", roles = "ADMIN")
+    void adminCanListUnverifiedCategoriesForReview() throws Exception {
+        saveCategory("REVIEW_CATEGORY", true, "UNVERIFIED", null);
+
+        mockMvc.perform(get("/api/admin/at-categories"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("REVIEW_CATEGORY"))
+                .andExpect(jsonPath("$[0].verificationStatus").value("UNVERIFIED"));
+    }
+
+    @Test
+    void categoryAdminListRequiresAdminAuthorization() throws Exception {
+        mockMvc.perform(get("/api/admin/at-categories")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("ordinary-user").roles("USER")))
+                .andExpect(status().isForbidden());
+    }
+
     private UUID saveCategory(
             String code,
             boolean active,

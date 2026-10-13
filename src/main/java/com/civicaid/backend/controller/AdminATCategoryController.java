@@ -30,6 +30,11 @@ public class AdminATCategoryController {
         this.atCategoryService = atCategoryService;
     }
 
+    @GetMapping
+    public ResponseEntity<List<ATCategoryResponse>> getAllCategoriesForAdmin() {
+        return ResponseEntity.ok(atCategoryService.getAllCategoriesForAdmin());
+    }
+
     @PostMapping
     public ResponseEntity<ATCategoryResponse> createCategory(
             @Valid @RequestBody ATCategoryCreateRequest request,

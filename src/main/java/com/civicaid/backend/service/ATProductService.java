@@ -69,6 +69,15 @@ public List<ATProductResponse> getPublicProducts() {
 }
 
 @Transactional(readOnly = true)
+public List<ATProductResponse> getAllProductsForAdmin() {
+    return atProductRepository.findAll().stream()
+            .sorted(java.util.Comparator.comparingInt(ATProduct::getDisplayOrder)
+                    .thenComparing(ATProduct::getName, String.CASE_INSENSITIVE_ORDER))
+            .map(this::toResponse)
+            .toList();
+}
+
+@Transactional(readOnly = true)
 public ATProductResponse getPublicProduct(UUID productId) {
     ATProduct product = atProductRepository
             .findByIdAndActiveTrueAndVerificationStatusAndLastVerifiedAtGreaterThanEqual(

@@ -28,4 +28,6 @@ public interface VerificationRecordRepository
 
     List<VerificationRecord> findByProviderServiceLocation_IdOrderByPerformedAtDesc(
             UUID providerServiceLocationId);
+
+    boolean existsByVerifierUser_Id(UUID verifierUserId);
 }

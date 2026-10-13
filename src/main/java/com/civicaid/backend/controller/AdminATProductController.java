@@ -32,6 +32,11 @@ public class AdminATProductController {
         this.atProductService = atProductService;
     }
 
+    @GetMapping("/products")
+    public ResponseEntity<List<ATProductResponse>> getAllProductsForAdmin() {
+        return ResponseEntity.ok(atProductService.getAllProductsForAdmin());
+    }
+
     @PostMapping("/at-categories/{categoryId}/products")
     public ResponseEntity<ATProductResponse> createProduct(
             @PathVariable UUID categoryId,

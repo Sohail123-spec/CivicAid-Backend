@@ -1,6 +1,8 @@
 
 package com.civicaid.backend.controller;
 
+import com.civicaid.backend.dto.SchemeCategoryResponse;
+import com.civicaid.backend.dto.SchemeProductResponse;
 import com.civicaid.backend.dto.SchemeResponse;
 import com.civicaid.backend.service.SchemeService;
 import java.util.List;
@@ -38,4 +40,22 @@ public class SchemeController {
         return ResponseEntity.ok(
                 schemeService.getPublicScheme(schemeId, stateCode));
     }
-}
+
+    @GetMapping("/{schemeId}/categories")
+    public ResponseEntity<List<SchemeCategoryResponse>> getPublicSchemeCategories(
+            @PathVariable UUID schemeId,
+            @RequestParam(required = false) String stateCode) {
+
+        return ResponseEntity.ok(
+                schemeService.getPublicSchemeCategories(schemeId, stateCode));
+    }
+
+    @GetMapping("/{schemeId}/products")
+    public ResponseEntity<List<SchemeProductResponse>> getPublicSchemeProducts(
+            @PathVariable UUID schemeId,
+            @RequestParam(required = false) String stateCode) {
+
+        return ResponseEntity.ok(
+                schemeService.getPublicSchemeProducts(schemeId, stateCode));
+    }
+}

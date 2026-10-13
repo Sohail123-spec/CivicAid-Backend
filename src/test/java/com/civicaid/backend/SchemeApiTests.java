@@ -51,12 +51,16 @@ class SchemeApiTests {
 
     @AfterEach
     void clearSchemes() {
+        jdbcTemplate.update("DELETE FROM scheme_products");
+        jdbcTemplate.update("DELETE FROM scheme_categories");
         jdbcTemplate.update(
                 "DELETE FROM verification_records WHERE scheme_id IS NOT NULL");
         jdbcTemplate.update(
                 "DELETE FROM audit_logs WHERE target_type IN "
                         + "('SCHEME', 'SCHEME_CATEGORY', 'SCHEME_PRODUCT')");
         jdbcTemplate.update("DELETE FROM schemes");
+        jdbcTemplate.update("DELETE FROM at_products");
+        jdbcTemplate.update("DELETE FROM at_categories");
     }
 
     @Test
@@ -203,6 +207,125 @@ class SchemeApiTests {
                         schemeId)
                         .with(user("ordinary-user").roles("USER")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "admin@example.org", roles = "ADMIN")
+    void adminCanMapCategoryAndProductToSchemeAndPublicQueriesEnforceVerificationGate()
+            throws Exception {
+
+        UUID catId = saveCategory("MOBILITY_TEST", true, "VERIFIED", LocalDate.now());
+        UUID prodId = saveProduct(catId, "WHEELCHAIR_TEST", true, "VERIFIED", LocalDate.now());
+        UUID schemeId = saveScheme("ADIP_TEST", true, "VERIFIED", LocalDate.now());
+
+        mockMvc.perform(post("/api/admin/schemes/{schemeId}/categories", schemeId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "categoryId": "%s",
+                                    "rationale": "Mobility appliances covered"
+                                }
+                                """.formatted(catId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categoryCode").value("MOBILITY_TEST"))
+                .andExpect(jsonPath("$.rationale").value("Mobility appliances covered"));
+
+        mockMvc.perform(post("/api/admin/schemes/{schemeId}/products", schemeId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "productId": "%s",
+                                    "rationale": "Manual wheelchair provided"
+                                }
+                                """.formatted(prodId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.productCode").value("WHEELCHAIR_TEST"))
+                .andExpect(jsonPath("$.rationale").value("Manual wheelchair provided"));
+
+        mockMvc.perform(get("/api/schemes/{schemeId}/categories", schemeId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].categoryCode").value("MOBILITY_TEST"));
+
+        mockMvc.perform(get("/api/schemes/{schemeId}/products", schemeId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].productCode").value("WHEELCHAIR_TEST"));
+
+        UUID unverifiedSchemeId = saveScheme("UNVERIFIED_SCHEME_TEST", true, "UNVERIFIED", null);
+        mockMvc.perform(post("/api/admin/schemes/{schemeId}/categories", unverifiedSchemeId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "categoryId": "%s",
+                                    "rationale": "Mapping on unverified scheme"
+                                }
+                                """.formatted(catId)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/schemes/{schemeId}/categories", unverifiedSchemeId))
+                .andExpect(status().isNotFound());
+    }
+
+    private UUID saveCategory(
+            String code,
+            boolean active,
+            String verificationStatus,
+            LocalDate lastVerifiedAt) {
+
+        UUID id = UUID.randomUUID();
+
+        jdbcTemplate.update("""
+                INSERT INTO at_categories (
+                    id, code, name, description, display_order, source_name, source_url,
+                    verification_status, last_verified_at, active, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+                id,
+                code,
+                code + " category",
+                "Category description",
+                0,
+                "Official source",
+                "https://example.org/" + code.toLowerCase(),
+                verificationStatus,
+                lastVerifiedAt,
+                active);
+
+        return id;
+    }
+
+    private UUID saveProduct(
+            UUID categoryId,
+            String code,
+            boolean active,
+            String verificationStatus,
+            LocalDate lastVerifiedAt) {
+
+        UUID id = UUID.randomUUID();
+
+        jdbcTemplate.update("""
+                INSERT INTO at_products (
+                    id, at_category_id, code, name, description,
+                    considerations, display_order, source_name, source_url,
+                    verification_status, last_verified_at, active,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+                id,
+                categoryId,
+                code,
+                code + " product",
+                "Product description",
+                null,
+                0,
+                "Official source",
+                "https://example.org/" + code.toLowerCase(),
+                verificationStatus,
+                lastVerifiedAt,
+                active);
+
+        return id;
     }
 
     private UUID saveScheme(

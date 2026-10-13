@@ -60,6 +60,15 @@ public class ATCategoryService {
     }
 
     @Transactional(readOnly = true)
+    public List<ATCategoryResponse> getAllCategoriesForAdmin() {
+        return atCategoryRepository.findAll().stream()
+                .sorted(java.util.Comparator.comparingInt(ATCategory::getDisplayOrder)
+                        .thenComparing(ATCategory::getName, String.CASE_INSENSITIVE_ORDER))
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public ATCategoryResponse getPublicCategory(UUID categoryId) {
         ATCategory category = atCategoryRepository
                 .findByIdAndActiveTrueAndVerificationStatusAndLastVerifiedAtGreaterThanEqual(

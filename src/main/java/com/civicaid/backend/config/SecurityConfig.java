@@ -50,13 +50,23 @@ public class SecurityConfig {
         return new ProviderManager(provider);
     }
 
+    @org.springframework.beans.factory.annotation.Value("${cors.allowed-origins:http://localhost:5173,http://localhost:5174,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175}")
+    private List<String> allowedOrigins;
+
+    @org.springframework.beans.factory.annotation.Value("${cors.allowed-origin-patterns:http://localhost:*,http://127.0.0.1:*,http://localhost:[*],http://127.0.0.1:[*]}")
+    private List<String> allowedOriginPatterns;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(
-                List.of("http://localhost:5173")
-        );
+        if (allowedOrigins != null && !allowedOrigins.isEmpty()) {
+            configuration.setAllowedOrigins(allowedOrigins);
+        }
+
+        if (allowedOriginPatterns != null && !allowedOriginPatterns.isEmpty()) {
+            configuration.setAllowedOriginPatterns(allowedOriginPatterns);
+        }
 
         configuration.setAllowedMethods(
                 List.of(
@@ -122,6 +132,16 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 HttpMethod.GET,
+                                "/api/users/me"
+                        ).authenticated()
+
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/users/me"
+                        ).authenticated()
+
+                        .requestMatchers(
+                                HttpMethod.DELETE,
                                 "/api/users/me"
                         ).authenticated()
 

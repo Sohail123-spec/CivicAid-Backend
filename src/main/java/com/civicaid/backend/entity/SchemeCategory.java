@@ -60,7 +60,7 @@ public class SchemeCategory {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    protected SchemeCategory() {
+    public SchemeCategory() {
     }
 
     public UUID getId() { return id; }

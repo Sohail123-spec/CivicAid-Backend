@@ -26,41 +26,53 @@ import com.civicaid.backend.dto.SchemeVerificationResponse;
 import com.civicaid.backend.entity.VerificationRecord;
 import com.civicaid.backend.entity.VerificationResult;
 import com.civicaid.backend.repository.VerificationRecordRepository;
+import com.civicaid.backend.dto.SchemeCategoryCreateRequest;
+import com.civicaid.backend.dto.SchemeCategoryResponse;
+import com.civicaid.backend.dto.SchemeProductCreateRequest;
+import com.civicaid.backend.dto.SchemeProductResponse;
+import com.civicaid.backend.entity.ATCategory;
+import com.civicaid.backend.entity.ATProduct;
+import com.civicaid.backend.entity.SchemeCategory;
+import com.civicaid.backend.entity.SchemeProduct;
+import com.civicaid.backend.repository.ATCategoryRepository;
+import com.civicaid.backend.repository.ATProductRepository;
+import com.civicaid.backend.repository.SchemeCategoryRepository;
+import com.civicaid.backend.repository.SchemeProductRepository;
 import java.time.Instant;
 
 @Service
-
 public class SchemeService {
 
     private static final int VERIFICATION_FRESHNESS_DAYS = 90;
 
     private final SchemeRepository schemeRepository;
-
     private final UserRepository userRepository;
-
     private final AuditLogService auditLogService;
-
     private final VerificationRecordRepository verificationRecordRepository;
+    private final SchemeCategoryRepository schemeCategoryRepository;
+    private final SchemeProductRepository schemeProductRepository;
+    private final ATCategoryRepository atCategoryRepository;
+    private final ATProductRepository atProductRepository;
 
     public SchemeService(
+            SchemeRepository schemeRepository,
+            UserRepository userRepository,
+            AuditLogService auditLogService,
+            VerificationRecordRepository verificationRecordRepository,
+            SchemeCategoryRepository schemeCategoryRepository,
+            SchemeProductRepository schemeProductRepository,
+            ATCategoryRepository atCategoryRepository,
+            ATProductRepository atProductRepository) {
 
-        SchemeRepository schemeRepository,
-
-        UserRepository userRepository,
-
-        AuditLogService auditLogService,
-
-        VerificationRecordRepository verificationRecordRepository) {
-
-    this.schemeRepository = schemeRepository;
-
-    this.userRepository = userRepository;
-
-    this.auditLogService = auditLogService;
-
-    this.verificationRecordRepository = verificationRecordRepository;
-
-}
+        this.schemeRepository = schemeRepository;
+        this.userRepository = userRepository;
+        this.auditLogService = auditLogService;
+        this.verificationRecordRepository = verificationRecordRepository;
+        this.schemeCategoryRepository = schemeCategoryRepository;
+        this.schemeProductRepository = schemeProductRepository;
+        this.atCategoryRepository = atCategoryRepository;
+        this.atProductRepository = atProductRepository;
+    }
 
     @Transactional(readOnly = true)
 
@@ -1076,4 +1088,137 @@ public class SchemeService {
 
     }
 
+    @Transactional(readOnly = true)
+    public List<SchemeCategoryResponse> getPublicSchemeCategories(UUID schemeId, String stateCode) {
+        getPublicScheme(schemeId, stateCode);
+        return schemeCategoryRepository.findByScheme_IdAndActiveTrue(schemeId)
+                .stream()
+                .filter(sc -> sc.getAtCategory().isActive()
+                        && sc.getAtCategory().getVerificationStatus() == VerificationStatus.VERIFIED)
+                .map(this::toSchemeCategoryResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SchemeProductResponse> getPublicSchemeProducts(UUID schemeId, String stateCode) {
+        getPublicScheme(schemeId, stateCode);
+        return schemeProductRepository.findByScheme_IdAndActiveTrue(schemeId)
+                .stream()
+                .filter(sp -> sp.getAtProduct().isActive()
+                        && sp.getAtProduct().getVerificationStatus() == VerificationStatus.VERIFIED
+                        && sp.getAtProduct().getAtCategory().isActive()
+                        && sp.getAtProduct().getAtCategory().getVerificationStatus() == VerificationStatus.VERIFIED)
+                .map(this::toSchemeProductResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SchemeCategoryResponse> getAdminSchemeCategories(UUID schemeId) {
+        requireScheme(schemeId);
+        return schemeCategoryRepository.findByScheme_Id(schemeId)
+                .stream()
+                .map(this::toSchemeCategoryResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SchemeProductResponse> getAdminSchemeProducts(UUID schemeId) {
+        requireScheme(schemeId);
+        return schemeProductRepository.findByScheme_Id(schemeId)
+                .stream()
+                .map(this::toSchemeProductResponse)
+                .toList();
+    }
+
+    @Transactional
+    public SchemeCategoryResponse addSchemeCategory(
+            UUID schemeId,
+            SchemeCategoryCreateRequest request,
+            String actorEmail) {
+        User actor = requireActor(actorEmail);
+        Scheme scheme = requireScheme(schemeId);
+        ATCategory category = atCategoryRepository.findById(request.categoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("AT Category not found"));
+
+        if (schemeCategoryRepository.existsByScheme_IdAndAtCategory_Id(schemeId, category.getId())) {
+            throw new ConflictException("Category is already mapped to this scheme");
+        }
+
+        SchemeCategory sc = new SchemeCategory();
+        sc.setScheme(scheme);
+        sc.setAtCategory(category);
+        sc.setRationale(request.rationale().trim());
+        sc.setActive(true);
+
+        SchemeCategory saved = schemeCategoryRepository.save(sc);
+        auditLogService.record(
+                actor,
+                AuditTargetType.SCHEME_CATEGORY,
+                saved.getId(),
+                AuditActionType.CREATE,
+                new String[] {"scheme_id", "at_category_id", "rationale", "active"},
+                "Added category " + category.getCode() + " to scheme " + scheme.getCode());
+
+        return toSchemeCategoryResponse(saved);
+    }
+
+    @Transactional
+    public SchemeProductResponse addSchemeProduct(
+            UUID schemeId,
+            SchemeProductCreateRequest request,
+            String actorEmail) {
+        User actor = requireActor(actorEmail);
+        Scheme scheme = requireScheme(schemeId);
+        ATProduct product = atProductRepository.findById(request.productId())
+                .orElseThrow(() -> new ResourceNotFoundException("AT Product not found"));
+
+        if (schemeProductRepository.existsByScheme_IdAndAtProduct_Id(schemeId, product.getId())) {
+            throw new ConflictException("Product is already mapped to this scheme");
+        }
+
+        SchemeProduct sp = new SchemeProduct();
+        sp.setScheme(scheme);
+        sp.setAtProduct(product);
+        sp.setRationale(request.rationale().trim());
+        sp.setActive(true);
+
+        SchemeProduct saved = schemeProductRepository.save(sp);
+        auditLogService.record(
+                actor,
+                AuditTargetType.SCHEME_PRODUCT,
+                saved.getId(),
+                AuditActionType.CREATE,
+                new String[] {"scheme_id", "at_product_id", "rationale", "active"},
+                "Added product " + product.getCode() + " to scheme " + scheme.getCode());
+
+        return toSchemeProductResponse(saved);
+    }
+
+    private SchemeCategoryResponse toSchemeCategoryResponse(SchemeCategory sc) {
+        return new SchemeCategoryResponse(
+                sc.getId(),
+                sc.getScheme().getId(),
+                sc.getAtCategory().getId(),
+                sc.getAtCategory().getCode(),
+                sc.getAtCategory().getName(),
+                sc.getAtCategory().getDescription(),
+                sc.getRationale(),
+                sc.isActive());
+    }
+
+    private SchemeProductResponse toSchemeProductResponse(SchemeProduct sp) {
+        return new SchemeProductResponse(
+                sp.getId(),
+                sp.getScheme().getId(),
+                sp.getAtProduct().getId(),
+                sp.getAtProduct().getCode(),
+                sp.getAtProduct().getName(),
+                sp.getAtProduct().getDescription(),
+                sp.getAtProduct().getAtCategory().getId(),
+                sp.getAtProduct().getAtCategory().getName(),
+                sp.getRationale(),
+                sp.isActive());
+    }
+
 }
+

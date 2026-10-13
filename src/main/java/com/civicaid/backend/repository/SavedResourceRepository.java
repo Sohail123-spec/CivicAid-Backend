@@ -38,4 +38,6 @@ public interface SavedResourceRepository
     boolean existsByUser_IdAndProviderServiceLocation_Id(
             UUID userId,
             UUID providerServiceLocationId);
+
+    void deleteByUser_Id(UUID userId);
 }

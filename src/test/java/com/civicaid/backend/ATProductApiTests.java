@@ -366,6 +366,25 @@ class ATProductApiTests {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    @WithMockUser(username = "admin@example.org", roles = "ADMIN")
+    void adminCanListUnverifiedProductsForReview() throws Exception {
+        UUID categoryId = saveCategory("REVIEW_PARENT", true, "UNVERIFIED", null);
+        saveProduct(categoryId, "REVIEW_PRODUCT", true, "UNVERIFIED", null);
+
+        mockMvc.perform(get("/api/admin/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("REVIEW_PRODUCT"))
+                .andExpect(jsonPath("$[0].verificationStatus").value("UNVERIFIED"));
+    }
+
+    @Test
+    void productAdminListRequiresAdminAuthorization() throws Exception {
+        mockMvc.perform(get("/api/admin/products")
+                        .with(user("ordinary-user").roles("USER")))
+                .andExpect(status().isForbidden());
+    }
+
     private UUID saveCategory(
             String code,
             boolean active,
